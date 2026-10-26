@@ -1,21 +1,25 @@
-/* Bermúdez Abogados y Asociados — behaviour. Everything here enhances a page that already works without it. */
+/* Miguel Bermúdez – Abogado — behaviour. Everything here enhances a page that already works without it. */
 (() => {
   'use strict';
   window.__site = true;
 
-  // WhatsApp number in international format, digits only. SAMPLE NUMBER: replace it here and in index.html
-  // (search 573000000000 and "300 000 0000") before publishing.
-  const WA = '573000000000';
+  // WhatsApp number in international format, digits only (+57 301 507 0487).
+  const WA = '573015070487';
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
 
   // Every WhatsApp link follows the one number above.
   document.querySelectorAll('a[data-wa]').forEach((a) => { a.href = a.href.replace(/wa\.me\/\d+/, 'wa.me/' + WA); });
 
-  /* ---------- Phone dock steps aside while the folder's own button is on screen ---------- */
+  /* ---------- Phone dock steps aside while the folder's button or the coupon is on screen ---------- */
   const dock = document.querySelector('.dock');
-  const folderBtn = document.querySelector('.folio__act .btn');
-  if (dock && folderBtn && 'IntersectionObserver' in window) {
-    new IntersectionObserver(([e]) => dock.classList.toggle('is-away', e.isIntersecting), { threshold: 0 }).observe(folderBtn);
+  const asides = [document.querySelector('.folio__act .btn'), document.querySelector('[data-coupon]')].filter(Boolean);
+  if (dock && asides.length && 'IntersectionObserver' in window) {
+    const seen = new Set();
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) e.isIntersecting ? seen.add(e.target) : seen.delete(e.target);
+      dock.classList.toggle('is-away', seen.size > 0);
+    }, { threshold: 0 });
+    asides.forEach((el) => io.observe(el));
   }
 
   /* ---------- Reveals: once, when the element enters ---------- */
@@ -61,6 +65,7 @@
   /* ---------- Casos: cards that fold into spines (desktop, motion allowed) ---------- */
   const casos = document.querySelector('[data-deck]');
   if (casos) {
+    const deck = casos.querySelector('[data-deck-list]');
     const cards = [...casos.querySelectorAll('.card')];
     const body = cards.map((c) => c.querySelector('.card__body'));
     const spine = cards.map((c) => c.querySelector('.card__spine'));
@@ -74,16 +79,20 @@
       const run = casos.offsetHeight - innerHeight;
       const p = Math.min(1, Math.max(0, -r.top / Math.max(1, run)));
       const s = p * (cards.length - 1);
+      // The open card shrinks on narrower screens so the last one always ends inside the grid.
+      const open = Math.max(SPINE * 3, Math.min(OPEN, deck.clientWidth - (cards.length - 1) * SPINE));
       let x = 0;
       cards.forEach((card, i) => {
         const c = Math.min(1, Math.max(0, s - i));          // 0 open, 1 folded into a spine
-        const fade = Math.min(1, c / 0.3);                   // the words leave before the card folds
+        const fade = Math.min(1, c / 0.2);                   // the words leave first,
+        const label = Math.min(1, Math.max(0, (c - 0.22) / 0.25)); // then the spine label arrives
         const fold = Math.max(0, (c - 0.3) / 0.7);
-        const w = OPEN - (OPEN - SPINE) * fold;
+        const w = open - (open - SPINE) * fold;
+        card.style.width = `${open}px`;
         card.style.transform = `translate3d(${x}px,0,0)`;
-        card.style.clipPath = `inset(0 ${OPEN - w}px 0 0)`;
+        card.style.clipPath = `inset(0 ${open - w}px 0 0)`;
         body[i].style.opacity = String(1 - fade);
-        spine[i].style.opacity = String(fade);
+        spine[i].style.opacity = String(label);
         card.classList.toggle('is-spine', c > 0.98);
         body[i].toggleAttribute('inert', fade > 0.9);
         body[i].style.visibility = fade >= 1 ? 'hidden' : '';
@@ -103,7 +112,7 @@
       } else {
         removeEventListener('scroll', onScroll);
         removeEventListener('resize', onScroll);
-        cards.forEach((c, i) => { c.style.transform = ''; c.style.clipPath = ''; c.classList.remove('is-spine'); body[i].style.opacity = ''; body[i].style.visibility = ''; spine[i].style.opacity = ''; body[i].removeAttribute('inert'); });
+        cards.forEach((c, i) => { c.style.width = ''; c.style.transform = ''; c.style.clipPath = ''; c.classList.remove('is-spine'); body[i].style.opacity = ''; body[i].style.visibility = ''; spine[i].style.opacity = ''; body[i].removeAttribute('inert'); });
       }
     };
     const check = () => setPinned(wide.matches && !reduce.matches);
@@ -232,13 +241,14 @@
     docs.append(status);
 
     const DOCS = {
-      atraso: ['La promesa de compraventa', 'Los recibos de pago', 'Las comunicaciones de la constructora sobre la fecha de entrega', 'El certificado de tradición del inmueble o del lote'],
+      atraso: ['La promesa de compraventa', 'Los recibos de pago', 'Las comunicaciones sobre la fecha de entrega'],
       fiducia: ['El contrato o certificado de vinculación a la fiducia', 'Los extractos y recibos de consignación', 'Su carta de desistimiento o la respuesta de la fiduciaria'],
-      distinto: ['La promesa de compraventa con el área y sus anexos', 'La publicidad, los planos o el folleto de la sala de ventas', 'El acta de entrega'],
-      escritura: ['La promesa de compraventa', 'Los recibos o el paz y salvo de pago', 'Las comunicaciones sobre la fecha de escrituración'],
-      danos: ['El acta de entrega', 'Fotos de los daños, con fecha', 'Los reclamos enviados a la constructora y sus respuestas'],
-      penalidad: ['El contrato firmado: promesa o vinculación a la fiducia', 'La liquidación o el extracto con el descuento', 'La carta en la que pidió desistir, si la envió'],
-      revision: ['El borrador del contrato o la minuta', 'Un certificado de tradición reciente', 'Los datos del vendedor o de la constructora'],
+      distinto: ['La promesa de compraventa con sus anexos', 'La publicidad o los planos de la sala de ventas', 'El acta de entrega'],
+      revision: ['El borrador del contrato o la minuta', 'Un certificado de tradición reciente', 'Los datos de la otra parte'],
+      contrato: ['Los datos de las partes', 'Un certificado de tradición reciente', 'Lo que ya acordaron: precio, plazos y forma de pago'],
+      predios: ['El certificado de tradición del predio', 'Escrituras, planos o levantamiento topográfico', 'Pruebas de la posesión: recibos, fotos, testigos'],
+      arriendo: ['El contrato de arrendamiento', 'Los recibos o el registro de cánones pagados y adeudados', 'Las comunicaciones con el arrendatario'],
+      servidumbre: ['El certificado de tradición de los predios', 'Escrituras y planos', 'Fotos del paso, la tubería o la obra en discusión'],
       otro: ['Los contratos que haya firmado', 'Los recibos de pago', 'Las comunicaciones con la otra parte']
     };
 
@@ -247,10 +257,11 @@
       const parts = ['Hola, Miguel.'];
       const n = nombre.value.trim();
       if (n) parts.push(`Soy ${n}.`);
-      if (que.value) parts.push(`Mi caso es que ${text(que)}${quien.value ? `, con ${text(quien)}` : ''}.`);
+      if (que.value === 'otro') parts.push(`Tengo otra situación${quien.value ? ` con ${text(quien)}` : ''}.`);
+      else if (que.value) parts.push(`Mi caso es que ${text(que)}${quien.value ? `, con ${text(quien)}` : ''}.`);
       else parts.push(`Quiero hacer una consulta${quien.value ? ` sobre un caso con ${text(quien)}` : ''}.`);
       if (etapa.value) parts.push(`Hoy ${text(etapa)}.`);
-      parts.push('¿Cómo agendo la consulta?');
+      parts.push('¿Cómo agendo una cita?');
       return parts.join(' ');
     };
     const fillSlot = (k, value, empty) => { const el = slot(k); el.textContent = value || empty; el.classList.toggle('is-empty', !value); };
